@@ -1,5 +1,6 @@
 package com.solidv.chronos.service;
 
+import com.solidv.chronos.config.ChronosProperties;
 import com.solidv.chronos.entity.DelayedTask;
 import com.solidv.chronos.entity.TaskStatus;
 import com.solidv.chronos.repository.DelayedTaskRepository;
@@ -18,6 +19,7 @@ import java.util.List;
 public class TaskLifecycleService {
 
     private final DelayedTaskRepository repository;
+    private final ChronosProperties properties;
 
     @Transactional
     public List<DelayedTask> claimPendingTasks(int batchSize) {
@@ -43,7 +45,8 @@ public class TaskLifecycleService {
             task.setStatus(TaskStatus.FAILED);
         } else {
             task.setStatus(TaskStatus.PENDING);
-            long backoffSeconds = 30L * (1L << (retryCount - 1));
+            long backoffSeconds = (long) (properties.retry().backoffBaseSeconds()
+                    * Math.pow(properties.retry().backoffMultiplier(), retryCount - 1));
             task.setExecuteAt(LocalDateTime.now().plusSeconds(backoffSeconds));
         }
 

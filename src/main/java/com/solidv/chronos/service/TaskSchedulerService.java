@@ -1,12 +1,12 @@
 package com.solidv.chronos.service;
 
+import com.solidv.chronos.config.ChronosProperties;
 import com.solidv.chronos.entity.DelayedTask;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
-import java.time.Duration;
 import java.util.List;
 
 @Slf4j
@@ -16,11 +16,12 @@ public class TaskSchedulerService {
 
     private final TaskLifecycleService lifecycleService;
     private final TaskExecutor taskExecutor;
+    private final ChronosProperties properties;
 
-    @Scheduled(fixedDelay = 5000)
+    @Scheduled(fixedDelayString = "${chronos.scheduler.poll-interval-ms}")
     public void pollAndProcessTasks() {
         log.debug("Polling for pending tasks...");
-        List<DelayedTask> claimedTasks = lifecycleService.claimPendingTasks(10);
+        List<DelayedTask> claimedTasks = lifecycleService.claimPendingTasks(properties.scheduler().batchSize());
 
         if (!claimedTasks.isEmpty()) {
             log.info("Claimed {} tasks for processing", claimedTasks.size());
@@ -38,8 +39,8 @@ public class TaskSchedulerService {
         }
     }
 
-    @Scheduled(fixedDelay = 60000)
+    @Scheduled(fixedDelayString = "${chronos.scheduler.recovery-interval-ms}")
     public void recoverStuckTasks() {
-        lifecycleService.recoverStuckTasks(Duration.ofMinutes(2));
+        lifecycleService.recoverStuckTasks(properties.scheduler().stuckTaskTimeout());
     }
 }

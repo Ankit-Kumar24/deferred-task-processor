@@ -1,5 +1,6 @@
 package com.solidv.chronos.service;
 
+import com.solidv.chronos.config.ChronosProperties;
 import com.solidv.chronos.dto.CreateTaskRequest;
 import com.solidv.chronos.dto.TaskResponse;
 import com.solidv.chronos.entity.DelayedTask;
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Service;
 public class TaskSubmissionService {
 
     private final DelayedTaskRepository taskRepository;
+    private final ChronosProperties properties;
 
     public TaskResponse createTask(CreateTaskRequest request) {
         DelayedTask task = DelayedTask.builder()
@@ -21,7 +23,7 @@ public class TaskSubmissionService {
                 .executeAt(request.executeAt())
                 .status(TaskStatus.PENDING)
                 .retryCount(0)
-                .maxRetries(3)
+                .maxRetries(properties.retry().maxRetries())
                 .build();
 
         DelayedTask saved = taskRepository.save(task);
