@@ -4,12 +4,15 @@ import com.solidv.chronos.entity.DelayedTask;
 import com.solidv.chronos.entity.TaskStatus;
 import com.solidv.chronos.repository.DelayedTaskRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class TaskLifecycleService {
@@ -45,5 +48,19 @@ public class TaskLifecycleService {
         }
 
         repository.save(task);
+    }
+
+    @Transactional
+    public void recoverStuckTasks(Duration timeout) {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime cutoff = now.minus(timeout);
+        List<DelayedTask> stuckTasks = repository.findByStatusAndUpdatedAtLessThan(
+                TaskStatus.PROCESSING, cutoff);
+
+        for (DelayedTask task : stuckTasks) {
+            Duration stuckDuration = Duration.between(task.getUpdatedAt(), now);
+            log.warn("Recovering stuck task ID={} after being stuck for {}", task.getId(), stuckDuration);
+            markTaskFailedOrRetry(task);
+        }
     }
 }

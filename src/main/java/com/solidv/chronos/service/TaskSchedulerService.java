@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.util.List;
 
 @Slf4j
@@ -35,5 +36,10 @@ public class TaskSchedulerService {
                 }
             }
         }
+    }
+
+    @Scheduled(fixedDelay = 60000)
+    public void recoverStuckTasks() {
+        lifecycleService.recoverStuckTasks(Duration.ofMinutes(2));
     }
 }

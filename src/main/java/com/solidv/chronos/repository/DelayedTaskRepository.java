@@ -15,6 +15,8 @@ public interface DelayedTaskRepository extends JpaRepository<DelayedTask, Long> 
 
     List<DelayedTask> findByStatusAndExecuteAtLessThanEqual(TaskStatus status, LocalDateTime executeAt);
 
+    List<DelayedTask> findByStatusAndUpdatedAtLessThan(TaskStatus status, LocalDateTime cutoff);
+
     /**
      * Finds and locks a batch of pending tasks that are due for execution.
      * SKIP LOCKED is used to prevent multiple instances from blocking each other.
