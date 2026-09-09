@@ -13,8 +13,6 @@ import java.util.List;
 @Repository
 public interface DelayedTaskRepository extends JpaRepository<DelayedTask, Long> {
 
-    List<DelayedTask> findByStatusAndExecuteAtLessThanEqual(TaskStatus status, LocalDateTime executeAt);
-
     List<DelayedTask> findByStatusAndUpdatedAtLessThan(TaskStatus status, LocalDateTime cutoff);
 
     /**
