@@ -1,0 +1,36 @@
+name: chronos
+services:
+  postgres:
+    image: postgres:17
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: chronos
+      POSTGRES_USER: "${DB_USERNAME:?DB_USERNAME is required}"
+      POSTGRES_PASSWORD: "${DB_PASSWORD:?DB_PASSWORD is required}"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/chronos
+      SPRING_DATASOURCE_USERNAME: "${DB_USERNAME:?DB_USERNAME is required}"
+      SPRING_DATASOURCE_PASSWORD: "${DB_PASSWORD:?DB_PASSWORD is required}"
+      MAIL_USERNAME: "${MAIL_USERNAME:?MAIL_USERNAME is required}"
+      MAIL_PASSWORD: "${MAIL_PASSWORD:?MAIL_PASSWORD is required}"
+
+volumes:
+  postgres_data:
