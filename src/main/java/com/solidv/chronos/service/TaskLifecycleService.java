@@ -10,7 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 
 @Slf4j
@@ -23,7 +23,7 @@ public class TaskLifecycleService {
 
     @Transactional
     public List<DelayedTask> claimPendingTasks(int batchSize) {
-        List<DelayedTask> tasks = repository.findTasksToClaim(LocalDateTime.now(), batchSize);
+        List<DelayedTask> tasks = repository.findTasksToClaim(Instant.now(), batchSize);
 
         tasks.forEach(task -> {
             task.setStatus(TaskStatus.PROCESSING);
@@ -47,7 +47,7 @@ public class TaskLifecycleService {
             task.setStatus(TaskStatus.PENDING);
             long backoffSeconds = (long) (properties.retry().backoffBaseSeconds()
                     * Math.pow(properties.retry().backoffMultiplier(), retryCount - 1));
-            task.setExecuteAt(LocalDateTime.now().plusSeconds(backoffSeconds));
+            task.setExecuteAt(Instant.now().plusSeconds(backoffSeconds));
         }
 
         repository.save(task);
@@ -55,8 +55,8 @@ public class TaskLifecycleService {
 
     @Transactional
     public void recoverStuckTasks(Duration timeout) {
-        LocalDateTime now = LocalDateTime.now();
-        LocalDateTime cutoff = now.minus(timeout);
+        Instant now = Instant.now();
+        Instant cutoff = now.minus(timeout);
         List<DelayedTask> stuckTasks = repository.findByStatusAndUpdatedAtLessThan(
                 TaskStatus.PROCESSING, cutoff);
 

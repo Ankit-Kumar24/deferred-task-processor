@@ -7,13 +7,13 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 
 @Repository
 public interface DelayedTaskRepository extends JpaRepository<DelayedTask, Long> {
 
-    List<DelayedTask> findByStatusAndUpdatedAtLessThan(TaskStatus status, LocalDateTime cutoff);
+    List<DelayedTask> findByStatusAndUpdatedAtLessThan(TaskStatus status, Instant cutoff);
 
     /**
      * Finds and locks a batch of pending tasks that are due for execution.
@@ -28,5 +28,5 @@ public interface DelayedTaskRepository extends JpaRepository<DelayedTask, Long> 
             LIMIT :batchSize
             FOR UPDATE SKIP LOCKED
             """, nativeQuery = true)
-    List<DelayedTask> findTasksToClaim(@Param("now") LocalDateTime now, @Param("batchSize") int batchSize);
+    List<DelayedTask> findTasksToClaim(@Param("now") Instant now, @Param("batchSize") int batchSize);
 }

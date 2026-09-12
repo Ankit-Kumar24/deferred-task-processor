@@ -6,16 +6,16 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 public record TaskResponse(
         Long id,
         JsonNode payload,
-        LocalDateTime executeAt,
+        Instant executeAt,
         TaskStatus status,
         int retryCount,
         int maxRetries,
-        LocalDateTime createdAt
+        Instant createdAt
 ) {
     public static TaskResponse fromEntity(DelayedTask task, JsonMapper objectMapper) {
         JsonNode payload;
