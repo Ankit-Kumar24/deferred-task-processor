@@ -13,11 +13,11 @@ The usual way to do this is a scheduled method that scans a table for rows that 
 That's the claim query:
 
 ```sql
-    SELECT * FROM delayed_tasks
-    WHERE status = 'PENDING' AND execute_at <= :now
-    ORDER BY execute_at
-    LIMIT :batchSize
-    FOR UPDATE SKIP LOCKED
+SELECT * FROM delayed_tasks
+WHERE status = 'PENDING' AND execute_at <= :now
+ORDER BY execute_at
+LIMIT :batchSize
+FOR UPDATE SKIP LOCKED
 ```
 
 It runs in one transaction with the status update, so the lock is held for as short a time as possible.
@@ -42,6 +42,35 @@ stateDiagram-v2
     FAILED --> [*]
 ```
 
+## Running it
+
+You only need Docker. The build happens inside the image, so there's no need for Java, Maven or PostgreSQL on the host.
+
+```bash
+git clone <repo-url>
+cd deferred-task-processor
+cp .env.example .env     # then fill in real values
+docker compose up --build
+```
+
+`.env` is gitignored so it won't come with the clone. `DB_USERNAME` and `DB_PASSWORD` can be anything — Compose creates the database with whatever you set. `MAIL_USERNAME` and `MAIL_PASSWORD` need a real Gmail address and app password, or the email executor has nothing to send through.
+
+The app comes up on `localhost:8080`, Postgres on `localhost:5433` — 5433 rather than 5432 so it doesn't clash with a local Postgres install. The app waits on the database's health check before starting, since it won't retry its first connection.
+
+```bash
+docker compose logs -f app   # follow the scheduler
+docker compose down          # stop, keep the data
+docker compose down -v       # stop, wipe the database
+```
+
+To run it outside a container you need Java 21, Maven and a PostgreSQL instance, with the same four variables exported into the environment.
+
+## How the image is built
+
+Two stages. The first builds the jar with Maven on a JDK image, the second copies the result onto a JRE-only image and runs as a non-root user — no compiler, build tool or source in the final image.
+
+The jar isn't copied in as one file. It's unpacked into layers (dependencies, loader, snapshot dependencies, application) and copied in that order, so changing a line of Java only invalidates the last and smallest layer. `pom.xml` is also copied and resolved before `src`, so a code change doesn't re-download the dependency tree.
+
 ## API
 
 The REST API is served under `/api/tasks`.
@@ -60,11 +89,13 @@ Content-Type: application/json
     "subject": "Reminder",
     "body": "Your scheduled reminder"
   },
-  "executeAt": "2027-09-23T12:00:00"
+  "executeAt": "2027-09-23T12:00:00+05:30"
 }
 ```
 
-The response status is `201 Created`.
+`executeAt` is an instant, so it must carry a zone offset — `+05:30` or `Z`. A timestamp without one is rejected, because there'd be no way to know which moment was meant. `payload` is any JSON object; only the executor cares what's in it, and the email one wants `to`, `subject` and `body`.
+
+The response status is `201 Created`. Timestamps come back in UTC.
 
 ```json
 {
@@ -74,11 +105,11 @@ The response status is `201 Created`.
     "subject": "Reminder",
     "body": "Your scheduled reminder"
   },
-  "executeAt": "2027-09-23T12:00:00",
+  "executeAt": "2027-09-23T06:30:00Z",
   "status": "PENDING",
   "retryCount": 0,
   "maxRetries": 3,
-  "createdAt": "2027-09-23T11:59:00"
+  "createdAt": "2026-10-24T07:46:00Z"
 }
 ```
 
@@ -94,15 +125,15 @@ Swagger UI is available at `/api/docs`.
 
 ## Configuration
 
-| Property | Default | Notes |
-|---|---|--|
-| `chronos.scheduler.poll-interval-ms` | `5000` | delay between polls                    |
-| `chronos.scheduler.batch-size` | `10` | tasks claimed per poll                 |
+| Property                                 | Default | Notes                                  |
+| ---------------------------------------- | ------- | -------------------------------------- |
+| `chronos.scheduler.poll-interval-ms`     | `5000`  | delay between polls                    |
+| `chronos.scheduler.batch-size`           | `10`    | tasks claimed per poll                 |
 | `chronos.scheduler.recovery-interval-ms` | `60000` | delay between recovery sweeps          |
-| `chronos.scheduler.stuck-task-timeout` | `2m` | how long PROCESSING is allowed to last |
-| `chronos.retry.max-retries` | `3` | retry budget for new tasks             |
-| `chronos.retry.backoff-base-seconds` | `30` | first retry delay                      |
-| `chronos.retry.backoff-multiplier` | `2` | growth per retry                       |
+| `chronos.scheduler.stuck-task-timeout`   | `2m`    | how long PROCESSING is allowed to last |
+| `chronos.retry.max-retries`              | `3`     | retry budget for new tasks             |
+| `chronos.retry.backoff-base-seconds`     | `30`    | first retry delay                      |
+| `chronos.retry.backoff-multiplier`       | `2`     | growth per retry                       |
 
 Credentials come from env vars: `DB_USERNAME`, `DB_PASSWORD`, `MAIL_USERNAME`, `MAIL_PASSWORD`.
 
@@ -113,18 +144,11 @@ Credentials come from env vars: `DB_USERNAME`, `DB_PASSWORD`, `MAIL_USERNAME`, `
 - Spring Data JPA
 - Spring MVC
 - Spring Mail
-- PostgreSQL
+- PostgreSQL 17
 - Springdoc OpenAPI
 - Lombok
 - Maven
-
-## Requirements
-
-- Java 21
-- PostgreSQL
-- Maven
-
-Containerized setup is coming.
+- Docker / Docker Compose
 
 ## Known limitations
 
@@ -132,5 +156,3 @@ Containerized setup is coming.
 - Permanent failures like a malformed payload burn the full retry budget the same as an SMTP timeout would.
 - No auth on the API.
 - No tests yet apart from the generated context-load one.
-
-
